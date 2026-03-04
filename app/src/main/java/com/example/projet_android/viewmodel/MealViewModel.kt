@@ -81,4 +81,13 @@ class MealViewModel(private val repository: MealRepository) : ViewModel() {
             _selectedMeal.value = repository.getMealById(id)
         }
     }
+    fun refreshData() {
+        viewModelScope.launch {
+            try {
+                repository.refreshIfNeeded()
+            } catch (e: Exception) {
+                // silencieux
+            }
+        }
+    }
 }

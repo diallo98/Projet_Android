@@ -94,4 +94,27 @@ class MealRepository(private val db: AppDatabase, private val context: Context) 
             ingredients = ingredients.joinToString("|")
         )
     }
+    // Vérifie si le cache doit être mis à jour (toutes les heures)
+    suspend fun refreshIfNeeded() {
+        if (!isOnline()) return
+        try {
+            val cachedMeals = dao.getAllMeals()
+            // Si le cache est vide ou si on a accès au réseau → on rafraîchit
+            if (cachedMeals.isEmpty()) {
+                val letters = listOf("a", "b", "c", "s", "m")
+                letters.forEach { letter ->
+                    val response = api.searchMeals(letter)
+                    val meals = response.meals?.map { it.toEntity() } ?: emptyList()
+                    if (meals.isNotEmpty()) dao.upsertMeals(meals)
+                }
+            } else {
+                // Rafraîchit silencieusement en arrière-plan
+                val response = api.searchMeals("a")
+                val meals = response.meals?.map { it.toEntity() } ?: emptyList()
+                if (meals.isNotEmpty()) dao.upsertMeals(meals)
+            }
+        } catch (e: Exception) {
+            // Silencieux - pas d'erreur affichée
+        }
+    }
 }

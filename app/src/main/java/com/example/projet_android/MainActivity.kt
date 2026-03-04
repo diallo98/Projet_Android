@@ -32,6 +32,7 @@ class MainActivity : ComponentActivity() {
 
                 when (currentScreen) {
                     "splash" -> SplashScreen(
+                        viewModel = viewModel,
                         onSplashFinished = { currentScreen = "list" }
                     )
                     "list" -> MealListScreen(
