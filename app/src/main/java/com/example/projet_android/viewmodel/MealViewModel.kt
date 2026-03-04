@@ -22,20 +22,28 @@ class MealViewModel(private val repository: MealRepository) : ViewModel() {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
-    private val _categories = MutableStateFlow<List<String>>(emptyList())
-    val categories: StateFlow<List<String>> = _categories
+    private val _isOffline = MutableStateFlow(false)
+    val isOffline: StateFlow<Boolean> = _isOffline
+
+    // Pagination
+    private var allMeals = listOf<MealEntity>()
+    private var currentPage = 0
+    private val pageSize = 30
 
     fun searchMeals(query: String) {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
+            _isOffline.value = !repository.isNetworkAvailable()
+            currentPage = 0
             try {
-                _meals.value = if (query.isBlank())
+                allMeals = if (query.isBlank())
                     repository.getAllMealsFromCache()
                 else
                     repository.searchMeals(query)
+                _meals.value = allMeals.take(pageSize)
             } catch (e: Exception) {
-                _error.value = "Erreur : ${e.message}"
+                _error.value = "Erreur réseau"
             } finally {
                 _isLoading.value = false
             }
@@ -46,13 +54,25 @@ class MealViewModel(private val repository: MealRepository) : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
+            _isOffline.value = !repository.isNetworkAvailable()
+            currentPage = 0
             try {
-                _meals.value = repository.getMealsByCategory(category)
+                allMeals = repository.getMealsByCategory(category)
+                _meals.value = allMeals.take(pageSize)
             } catch (e: Exception) {
-                _error.value = "Erreur : ${e.message}"
+                _error.value = "Erreur réseau"
             } finally {
                 _isLoading.value = false
             }
+        }
+    }
+
+    fun loadNextPage() {
+        val nextPage = currentPage + 1
+        val nextItems = allMeals.take(pageSize * (nextPage + 1))
+        if (nextItems.size > _meals.value.size) {
+            currentPage = nextPage
+            _meals.value = nextItems
         }
     }
 
@@ -60,9 +80,5 @@ class MealViewModel(private val repository: MealRepository) : ViewModel() {
         viewModelScope.launch {
             _selectedMeal.value = repository.getMealById(id)
         }
-    }
-
-    fun loadInitialMeals() {
-        searchMeals("")
     }
 }

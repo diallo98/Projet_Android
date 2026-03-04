@@ -3,8 +3,9 @@ package com.example.projet_android.screens
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,9 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.projet_android.data.local.MealEntity
-//import com.example.projet_android.ui.MealViewModel
 import com.example.projet_android.viewmodel.MealViewModel
-
 
 val categories = listOf("All", "Chicken", "Beef", "Seafood", "Vegetarian", "Dessert", "Pasta")
 
@@ -33,6 +32,25 @@ fun MealListScreen(
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("All") }
+
+    // State de la liste pour détecter quand on arrive en bas
+    val listState = rememberLazyListState()
+
+    // Détecte quand on arrive au dernier élément
+    val reachedBottom by remember {
+        derivedStateOf {
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()
+            val totalItems = listState.layoutInfo.totalItemsCount
+            lastVisible != null && lastVisible.index >= totalItems - 2
+        }
+    }
+
+    // Charge la page suivante quand on arrive en bas
+    LaunchedEffect(reachedBottom) {
+        if (reachedBottom && meals.isNotEmpty()) {
+            viewModel.loadNextPage()
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.searchMeals("a")
@@ -80,22 +98,41 @@ fun MealListScreen(
 
         // Contenu
         when {
-            isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = OrangeFood)
-            }
-            error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Erreur réseau", color = Color.Red)
-                    Spacer(Modifier.height(8.dp))
-                    Button(
-                        onClick = { viewModel.searchMeals(searchQuery.ifBlank { "a" }) },
-                        colors = ButtonDefaults.buttonColors(containerColor = OrangeFood)
-                    ) { Text("Réessayer") }
+            isLoading && meals.isEmpty() -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = OrangeFood)
                 }
             }
-            else -> LazyColumn {
-                items(meals) { meal ->
-                    MealCard(meal = meal, onClick = { onMealClick(meal.id) })
+            error != null && meals.isEmpty() -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Erreur réseau", color = Color.Red)
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = { viewModel.searchMeals(searchQuery.ifBlank { "a" }) },
+                            colors = ButtonDefaults.buttonColors(containerColor = OrangeFood)
+                        ) { Text("Réessayer") }
+                    }
+                }
+            }
+            else -> {
+                LazyColumn(state = listState) {
+                    items(meals) { meal ->
+                        MealCard(meal = meal, onClick = { onMealClick(meal.id) })
+                    }
+                    // Indicateur de chargement en bas
+                    if (isLoading) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(color = OrangeFood)
+                            }
+                        }
+                    }
                 }
             }
         }

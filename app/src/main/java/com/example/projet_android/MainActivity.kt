@@ -21,7 +21,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val db = AppDatabase.getInstance(this)
-        val repository = MealRepository(db)
+        val repository = MealRepository(db, this)
         val factory = MealViewModelFactory(repository)
 
         setContent {
